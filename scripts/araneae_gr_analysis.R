@@ -37,21 +37,21 @@ write_delim(no_coordinates, "../results/no_coordinates.tsv",delim="\t")
 
 ### clean
 ### Agyneta pseudorurestris is twice.
-araneae_gr_tax |> group_by(Species) |> count(Species) |> arrange(desc(n)) 
+#araneae_gr_tax |> group_by(Species) |> count(Species) |> arrange(desc(n)) 
 
 ### which species
 
-anti_species_occ <- araneae_gr_occ |> 
-    group_by(Species) |> 
-    summarise(occurrences=n()) |>
-    anti_join(araneae_gr_tax)
+#anti_species_occ <- araneae_gr_occ |> 
+#    group_by(Species) |> 
+#    summarise(occurrences=n()) |>
+#    anti_join(araneae_gr_tax)
 
-write_delim(anti_species_occ, "../results/anti_species_occ.tsv",delim="\t")
+#write_delim(anti_species_occ, "../results/anti_species_occ.tsv",delim="\t")
 
-anti_species_tax <- araneae_gr_tax |>
-    anti_join(araneae_gr_occ)
+#anti_species_tax <- araneae_gr_tax |>
+#    anti_join(araneae_gr_occ)
     
-write_delim(anti_species_tax, "../results/anti_species_tax.tsv",delim="\t")
+#write_delim(anti_species_tax, "../results/anti_species_tax.tsv",delim="\t")
 
 ## there are 317 occurrences without coordinates
 
@@ -140,8 +140,8 @@ species_family_plot <- ggplot()+
 ggsave("species_family_plot.png",
        plot = species_family_plot,
        device = "png",
-       width = 50,
-       height = 36,
+       width = 60,
+       height = 30,
        units = "cm",
        dpi = 100,
        path = "../figures/")
