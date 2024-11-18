@@ -24,6 +24,7 @@ hellenic_municipalities_shp <- sf::st_read("../data/municipalities_shape_file/mu
     left_join(municipalities_names) |>
     dplyr::select(-NAME)
 
+# https://gadm.org
 greece_regions <- sf::st_read("../data/gadm41_GRC_shp/gadm41_GRC_2.shp")
 
 #greece_regions <- c("Athos","East Macedonia and Thrace","Attica ","West Greece","West Macedonia","Ionian Islands ","Epirus ","Central Macedonia","Crete","South Aegean","Peloponnese ","Central Greece ","Thessaly","North Aegean")
@@ -202,11 +203,30 @@ ggsave("species_family_plot.png",
        path = "../figures/")
 
 ## summary per region
+# occurrences
+region_summary_occ <- araneae_gr_occ_tax |> 
+    distinct(NAME_2,family, scientificName,endemic,decimalLongitude,decimalLatitude) |>
+    group_by(NAME_2) |>
+    summarise(occurrences=n())
 
-region_summary <- araneae_gr_occ_tax |> 
-    distinct(NAME_2,scientificName,endemic,decimalLongitude,decimalLatitude)
+# species
+region_summary_sp <- araneae_gr_occ_tax |> 
+    distinct(NAME_2,scientificName) |>
+    group_by(NAME_2) |>
+    summarise(species=n())
 
+# endemics
+region_summary_end <- araneae_gr_occ_tax |> 
+    distinct(NAME_2,scientificName, endemic) |>
+    na.omit(endemic) |> 
+    group_by(NAME_2) |>
+    summarise(endemics=n())
 
+region_all <- region_summary_occ |>
+    left_join(region_summary_sp) |>
+    left_join(region_summary_end)
+
+write_delim(region_all, "../results/regions_all_stats.tsv", delim="\t")
 
 # References summary
 
