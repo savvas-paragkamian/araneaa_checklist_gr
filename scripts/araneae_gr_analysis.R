@@ -234,6 +234,15 @@ araneae_gr_occ_ref <- araneae_gr_occ_tax |>
     left_join(araneae_gr_ref,
               by=c("associatedReferences"="associatedReferences"))
 
+araneae_ref_year <- araneae_gr_occ_ref |> 
+    distinct(associatedReferences,year) |>
+    group_by(year) |>
+    summarise(occurrance=n()) |>
+    arrange(year) |>
+    mutate(Cumulative_occurrance=cumsum(occurrance),
+           Classification="Publications") 
+
+
 ## Species knowledge accumulation
 
 ### all species per year per reference
@@ -270,7 +279,7 @@ endemic_cumulative_species <- araneae_gr_occ_ref |>
     ungroup() 
 
 ### combine data
-araneae_accumulation <- bind_rows(species_cumulative,endemic_cumulative_species)
+araneae_accumulation <- bind_rows(araneae_ref_year, species_cumulative,endemic_cumulative_species)
 
 ### timeline figure
 araneae_accumulation_plot <- ggplot()+
