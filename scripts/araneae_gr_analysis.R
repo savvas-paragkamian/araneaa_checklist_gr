@@ -33,7 +33,6 @@ greece_regions <- sf::st_read("../data/gadm41_GRC_shp/gadm41_GRC_2.shp")
 
 #greece_regions <- c("Athos","East Macedonia and Thrace","Attica ","West Greece","West Macedonia","Ionian Islands ","Epirus ","Central Macedonia","Crete","South Aegean","Peloponnese ","Central Greece ","Thessaly","North Aegean")
 
-
 ## load data from excel file
 
 araneae_gr_tax <- readxl::read_excel("../data/spiders_gr_dataset.xlsx", sheet="Taxon")
@@ -90,6 +89,7 @@ araneae_gr_occ_tax <- araneae_gr |>
               by=c("scientificName"="scientificName")) |>
     mutate(taxonDistribution=if_else(is.na(endemic),"Non endemic","Endemic"))
 
+write_delim(araneae_gr_occ_tax,"../results/araneae_gr_occ_tax.tsv",delim="\t")
 
 ## IUCN categories per family
 
@@ -110,6 +110,13 @@ araneae_endemics_family <- araneae_gr_occ_tax |>
     group_by(family) |>
     summarise(endemics=n())
 
+araneae_endemics_all_all <- araneae_gr_occ_tax |> 
+    distinct(scientificName,
+             family,
+             decimalLongitude,decimalLatitude,
+             endemic,
+             iucnStatus,CELLCODE) |>
+    filter(!is.na(endemic)) 
 ## all endemics
 araneae_endemics_all <- araneae_gr_occ_tax |> 
     distinct(scientificName,
@@ -240,6 +247,50 @@ ggsave("species_family_plot.png",
        dpi = 300,
        path = "../figures/")
 
+################################## gbif ###################################
+gbif_arachnida <- read_delim("../data/0058835-241126133413365/occurrence.txt", delim="\t")
+
+# filter
+gbif_f <- gbif_arachnida |>
+    dplyr::distinct(phylum,
+                  class,
+                  order,
+                  family,
+                  species,
+                  acceptedScientificName,
+                  collectionCode,
+                  basisOfRecord,
+                  institutionCode,
+                  year,
+                  decimalLatitude,
+                  decimalLongitude)
+
+
+gbif_occ_citizen <- gbif_f |>
+    filter(!is.na(decimalLatitude)) |>
+    filter(basisOfRecord=="HUMAN_OBSERVATION") |>
+    st_as_sf(coords=c("decimalLongitude", "decimalLatitude"),
+             remove=F,
+             crs="WGS84") |>
+    filter(order=="Araneae") |>
+    st_intersection(greece_regions) |>
+    st_join(gr_1km)
+
+
+gbif_occ <- gbif_f |>
+    filter(!is.na(decimalLatitude)) |>
+    filter(basisOfRecord!="HUMAN_OBSERVATION") |>
+    st_as_sf(coords=c("decimalLongitude", "decimalLatitude"),
+             remove=F,
+             crs="WGS84")
+
+gbif_araneae_gr <- gbif_occ |>
+    filter(order=="Araneae") |>
+    st_intersection(greece_regions) |>
+    st_join(gr_1km)
+
+
+gbif_join <- bind_rows(gbif_occ_citizen,gbif_araneae_gr)
 ################################## maps ###################################
 ## map
 
@@ -270,6 +321,42 @@ ggsave("../figures/araneae_gr_base.png",
        units="cm",
        device="png")
 
+## gbif
+araneae_gr_gbif <- ggplot() +
+    geom_sf(greece_regions, mapping=aes(),color="gray70") +
+    geom_point(gbif_join,
+            mapping=aes(y=decimalLatitude, x=decimalLongitude,color=basisOfRecord),
+            size=1,
+            alpha=0.7,
+            show.legend=T) +
+    coord_sf(crs="WGS84") +
+    ggtitle("GBIF Araneae of Greece")+
+    scale_color_manual(values = c(
+                                  "HUMAN_OBSERVATION"="springgreen2",
+                                  "PRESERVED_SPECIMEN"="lightsalmon2",
+                                  "MATERIAL_CITATION"="darkorchid2",
+                                  "OCCURRENCE"="springgreen4",
+                                  "MATERIAL_SAMPLE"="khaki3"
+                               ))+
+    theme_bw()+
+    theme(axis.title=element_blank(),
+          axis.text=element_text(colour="black"),
+          legend.title = element_text(size=8),
+          legend.position = "inside",
+          legend.position.inside = c(0.85,0.8),
+          legend.box.background = element_blank())
+
+ggsave("../figures/araneae_gr_gbif.png", 
+       plot=araneae_gr_gbif, 
+       height = 20, 
+       width = 20,
+       dpi = 300, 
+       units="cm",
+       device="png")
+
+
+
+## families
 family_names <- unique(araneae_gr_occ_tax$family)
 family_plots <- list()
 
@@ -312,8 +399,8 @@ for (i in seq_along(family_names)) {
 
 
 fig2 <- ggarrange(araneae_gr_base,
+                  araneae_gr_gbif,
                   family_plots[["Gnaphosidae"]],
-                  family_plots[["Linyphiidae"]],
                   family_plots[["Dysderidae"]],
                   family_plots[["Theraphosidae"]],
                   family_plots[["Leptonetidae"]],
@@ -360,7 +447,7 @@ region_all <- region_summary_occ |>
 
 write_delim(region_all, "../results/regions_all_stats.tsv", delim="\t")
 
-# References summary
+############################# References summary #########################
 
 araneae_gr_occ_ref <- araneae_gr_occ_tax |>
     left_join(araneae_gr_ref,
@@ -410,10 +497,46 @@ endemic_cumulative_species <- araneae_gr_occ_ref |>
     dplyr::select(-c(endemic,endemic_species_year)) |> 
     ungroup() 
 
-### combine data
-araneae_accumulation <- bind_rows(araneae_ref_year, species_cumulative,endemic_cumulative_species)
+#################################### GBIF ####################################
 
-### timeline figure
+gbif_cumulative <- gbif_araneae_gr |> 
+    distinct(acceptedScientificName, collectionCode,year) |>
+    arrange(year) |>
+    mutate(Duplicates=duplicated(acceptedScientificName)) |> 
+    mutate(First_occurrance=if_else(Duplicates=="FALSE",1,0)) |> 
+    na.omit() |> 
+    filter(First_occurrance==1) |>
+    group_by(year) |> 
+    summarise(species_year= n()) |>
+    arrange(year) |> 
+    mutate(Cumulative_occurrance= cumsum(species_year)) |> 
+    mutate(Classification="GBIF species from specimen | sample | citation") |> 
+    dplyr::select(-c(species_year)) |>
+    distinct()
+
+gbif_citizen_cumulative <- gbif_occ_citizen |> 
+    distinct(acceptedScientificName, collectionCode,year) |>
+    arrange(year) |>
+    mutate(Duplicates=duplicated(acceptedScientificName)) |> 
+    mutate(First_occurrance=if_else(Duplicates=="FALSE",1,0)) |> 
+    na.omit() |> 
+    filter(First_occurrance==1) |>
+    group_by(year) |> 
+    summarise(species_year= n()) |>
+    arrange(year) |> 
+    mutate(Cumulative_occurrance= cumsum(species_year)) |> 
+    mutate(Classification="GBIF human observation species") |> 
+    dplyr::select(-c(species_year)) |>
+    distinct()
+
+####################### araneae_accumulation ########################
+araneae_accumulation <- bind_rows(araneae_ref_year,
+                                  species_cumulative,
+                                  endemic_cumulative_species,
+                                  gbif_cumulative,
+                                  gbif_citizen_cumulative)
+
+############################ timeline figure ###############################
 araneae_accumulation_plot <- ggplot()+
     geom_line(data=araneae_accumulation,
               aes(x=year,
@@ -427,8 +550,13 @@ araneae_accumulation_plot <- ggplot()+
     scale_y_continuous(breaks = seq(0,1400,100),
                        limits = c(0,1400),
                        expand = c(0.01,0))+
-    scale_color_manual(values =c("Endemic species to Greece"="firebrick1",
-                                 "All species"="darkseagreen4"))+
+    scale_color_manual(values =c(
+                                 "Endemic species to Greece"="firebrick1",
+                                 "GBIF human observation species"="springgreen2",
+                                 "GBIF species from specimen | sample | citation"="chartreuse4",
+                                 "Publications"="darkorchid2",
+                                 "All species"="gray0"
+                                 ))+
     labs(x="Years",
          y="Cumulative number of species")+
     theme_bw()+
@@ -441,7 +569,7 @@ araneae_accumulation_plot <- ggplot()+
           panel.border = element_blank(),
           axis.line.x = element_line(colour = 'black', linewidth = 0.3), 
           axis.line.y = element_line(colour = 'black', linewidth = 0.3),
-          legend.position = c(0.13,0.87), 
+          legend.position = c(0.23,0.87), 
           legend.key.size = unit(1.5, "cm"), 
           legend.title = element_blank())
   
@@ -453,4 +581,3 @@ ggsave("araneae_accumulation_plot.png",
        units = "cm",
        dpi = 300,
        path = "../figures/")
-
