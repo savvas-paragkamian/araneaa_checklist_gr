@@ -10,6 +10,7 @@
 ## Date Created: 2024-11-05
 ##
 library(tidyverse)
+library(ggpubr)
 library(readxl)
 library(sf)
 library(terra)
@@ -23,6 +24,9 @@ municipalities_names <- readxl::read_excel("../data/municipalities_shape_file/na
 hellenic_municipalities_shp <- sf::st_read("../data/municipalities_shape_file/municipalities_Kallikratis_plan_Greece.shp") |>
     left_join(municipalities_names) |>
     dplyr::select(-NAME)
+
+gr_1km <- sf::st_read("../data/eea_1km/gr_1km.shp") |>
+    st_transform(., crs="WGS84")
 
 # https://gadm.org
 greece_regions <- sf::st_read("../data/gadm41_GRC_shp/gadm41_GRC_2.shp")
@@ -72,40 +76,19 @@ araneae_gr_occ_sf <- araneae_gr_occ |>
 
 # keep only the occurrences inside Greece. 85 occurrences are removed
 # this takes 3-5 minutes to run
-araneae_gr <- st_intersection(araneae_gr_occ_sf,greece_regions)
+# add the cellcode of the EEA reference grid
+araneae_gr <- st_intersection(araneae_gr_occ_sf,greece_regions) |>
+    st_join(gr_1km)
 
-## map
-
-araneae_gr_base <- ggplot() +
-    geom_sf(greece_regions, mapping=aes(),color="gray80") +
-    geom_point(araneae_gr,
-            mapping=aes(x=decimalLatitude, y=decimalLongitude),
-            color="orange",
-            size=1,
-            alpha=0.5,
-            show.legend=T) +
-    coord_sf(crs="WGS84") +
-    theme_bw()+
-    theme(axis.title=element_blank(),
-          axis.text=element_text(colour="black"),
-          legend.title = element_text(size=8),
-          legend.position = "right",
-          legend.box.background = element_blank())
-
-ggsave("../figures/araneae_gr_base.png", 
-       plot=araneae_gr_base, 
-       height = 20, 
-       width = 20,
-       dpi = 300, 
-       units="cm",
-       device="png")
+#araneae_gr_1km <- st_join(araneae_gr,gr_1km)
 
 
-## taxonomic summary
-
+############################ taxonomic summary ###########################
+## master dataframe
 araneae_gr_occ_tax <- araneae_gr |>
     left_join(araneae_gr_tax,
-              by=c("scientificName"="scientificName"))
+              by=c("scientificName"="scientificName")) |>
+    mutate(taxonDistribution=if_else(is.na(endemic),"Non endemic","Endemic"))
 
 
 ## IUCN categories per family
@@ -127,28 +110,82 @@ araneae_endemics_family <- araneae_gr_occ_tax |>
     group_by(family) |>
     summarise(endemics=n())
 
+## all endemics
+araneae_endemics_all <- araneae_gr_occ_tax |> 
+    distinct(scientificName,
+             family,
+             decimalLongitude,decimalLatitude,
+             endemic,
+             iucnStatus,CELLCODE) |>
+    filter(!is.na(endemic)) |>
+    group_by(scientificName)|>
+    mutate(occurrences=n(),
+           sq_km=length(unique(CELLCODE)),
+           species=1) |>
+    distinct(scientificName,species,occurrences,iucnStatus,sq_km) |>
+    ungroup()
+
+araneae_endemics_iucn <- araneae_endemics_all |>
+    dplyr::select(iucnStatus,species) |>
+    group_by(iucnStatus) |>
+    summarise(species=sum(species)) |>
+    pivot_wider(names_from=iucnStatus,
+                values_from=species,
+                values_fill=0)
+
+araneae_endemics_sum <- araneae_endemics_all |>
+    dplyr::select(species,occurrences,sq_km) |>
+    mutate(family="endemics") |>
+    group_by(family) |>
+    summarise(across(everything(), ~ sum(.x,na.rm = TRUE))) |>
+    bind_cols(araneae_endemics_iucn)
+
+## eea sq km per family
+##
+
+
+
 ## summary per family
 ###     distinct(family, scientificName,decimalLongitude,decimalLatitude) 
 ###     because some references have the same occurrence
 
 araneae_gr_occ_tax_f <- araneae_gr_occ_tax |> 
     st_drop_geometry() |>
-    distinct(family, scientificName,decimalLongitude,decimalLatitude) |>
+    distinct(family,
+             scientificName,
+             decimalLongitude,
+             decimalLatitude, CELLCODE) |>
     group_by(scientificName,family) |>
-    summarise(occurrences=n(), .groups="keep") |> 
+    summarise(occurrences=n(),
+              sq_km=length(unique(CELLCODE)),
+              .groups="keep") |> 
     group_by(family) |>
-    summarise(species=n(),occurrences=sum(occurrences)) |>
+    summarise(species=n(),
+              occurrences=sum(occurrences),
+              sq_km=sum(sq_km)) |>
     left_join(araneae_endemics_family) |>
     mutate(across(everything(), ~ replace_na(.x, 0)))
 
 araneae_f <- araneae_gr_occ_tax_f |>
     left_join(araneae_gr_occ_tax_iucn)
 
-araneae_family_summary <- araneae_f |>
+## total
+
+araneae_total_iucn <- araneae_f  |>
+    dplyr::select(-c(occurrences,sq_km)) |>
     mutate(family="total") |>
     group_by(family) |>
-    summarise(across(everything(), ~ sum(.x,na.rm = TRUE))) |>
-    bind_rows(araneae_f)
+    summarise(across(everything(), ~ sum(.x,na.rm = TRUE))) 
+
+araneae_total_area <- araneae_gr_occ_tax |>
+    mutate(family="total") |>
+    distinct(decimalLongitude,decimalLatitude,CELLCODE, family) |>
+    group_by(family) |>
+    summarise(occurrences=n(), sq_km=length(unique(CELLCODE)))
+
+araneae_family_summary <- araneae_total_area |>
+    left_join(araneae_total_iucn) |>
+    bind_rows(araneae_endemics_sum,araneae_f)
 
 write_delim(araneae_family_summary,
             "../results/araneae_family_summary.tsv",
@@ -175,6 +212,7 @@ species_family_plot <- ggplot()+
   scale_x_discrete(expand = c(0.01,0.4))+
   scale_fill_manual(values = c("species"="darkseagreen4",
                                "occurrences"="darkorange",
+                               "sq_km"="cadetblue",
                                "endemics"="firebrick1"),
                     name="")+
   labs(x="Family", y= "Count")+
@@ -201,6 +239,100 @@ ggsave("species_family_plot.png",
        units = "cm",
        dpi = 300,
        path = "../figures/")
+
+################################## maps ###################################
+## map
+
+araneae_gr_base <- ggplot() +
+    geom_sf(greece_regions, mapping=aes(),color="gray70") +
+    geom_point(araneae_gr_occ_tax,
+            mapping=aes(x=decimalLatitude, y=decimalLongitude,color=taxonDistribution),
+            size=1,
+            alpha=0.7,
+            show.legend=T) +
+    coord_sf(crs="WGS84") +
+    ggtitle("Araneae of Greece")+
+    scale_color_manual(values = c("Endemic"="firebrick1",
+                               "Non endemic"="cadetblue"))+
+    theme_bw()+
+    theme(axis.title=element_blank(),
+          axis.text=element_text(colour="black"),
+          legend.title = element_text(size=8),
+          legend.position = "inside",
+          legend.position.inside = c(0.9,0.9),
+          legend.box.background = element_blank())
+
+ggsave("../figures/araneae_gr_base.png", 
+       plot=araneae_gr_base, 
+       height = 20, 
+       width = 20,
+       dpi = 300, 
+       units="cm",
+       device="png")
+
+family_names <- unique(araneae_gr_occ_tax$family)
+family_plots <- list()
+
+for (i in seq_along(family_names)) {
+
+    print(family_names[i])
+
+    family_data <- araneae_gr_occ_tax |>
+        filter(family==family_names[i])
+
+    araneae_family <- ggplot() +
+        geom_sf(greece_regions, mapping=aes(),color="gray70") +
+        geom_point(family_data,
+                mapping=aes(x=decimalLatitude, y=decimalLongitude,color=taxonDistribution),
+                size=1,
+                alpha=0.7,
+                show.legend=T) +
+        coord_sf(crs="WGS84") +
+        ggtitle(family_names[i]) +
+        scale_color_manual(values = c("Endemic"="firebrick1",
+                                   "Non endemic"="cadetblue"))+
+        theme_bw()+
+        theme(axis.title=element_blank(),
+              axis.text=element_text(colour="black"),
+              legend.title = element_text(size=8),
+              legend.position = "inside",
+              legend.position.inside = c(0.9,0.9),
+              legend.box.background = element_blank())
+    
+    family_plots[[family_names[i]]] <- araneae_family
+    ggsave(paste0("../figures/",family_names[i],"_distribution.png"), 
+           plot=araneae_family, 
+           height = 20, 
+           width = 20,
+           dpi = 300, 
+           units="cm",
+           device="png")
+
+}
+
+
+fig2 <- ggarrange(araneae_gr_base,
+                  family_plots[["Gnaphosidae"]],
+                  family_plots[["Linyphiidae"]],
+                  family_plots[["Dysderidae"]],
+                  family_plots[["Theraphosidae"]],
+                  family_plots[["Leptonetidae"]],
+          labels = c("A", "B","C","D","E","F"),
+          align = "hv",
+          widths = c(1,1,1,1,1,1),
+          ncol = 2,
+          nrow = 3,
+          font.label=list(color="black",size=22)) + bgcolor("white")
+
+ggsave("../figures/Fig2.png", 
+       plot=fig2, 
+       height = 50, 
+       width = 35,
+       dpi = 300, 
+       units="cm",
+       device="png")
+
+################################## region ###################################
 
 ## summary per region
 # occurrences
