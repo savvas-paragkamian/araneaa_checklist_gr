@@ -422,6 +422,18 @@ ggsave("../figures/Fig2.png",
 ################################## region ###################################
 
 ## summary per region
+region_area <- greece_regions |>
+    mutate(area=round(set_units(st_area(geometry),km^2),0)) |>
+    st_drop_geometry() |>
+    distinct(NAME_2, area)
+
+# sq_km
+#
+region_summary_1km <- araneae_gr_occ_tax |> 
+    distinct(NAME_2,CELLCODE) |>
+    group_by(NAME_2) |>
+    summarise(sq_km=n())
+
 # occurrences
 region_summary_occ <- araneae_gr_occ_tax |> 
     distinct(NAME_2,family, scientificName,endemic,decimalLongitude,decimalLatitude) |>
@@ -443,7 +455,10 @@ region_summary_end <- araneae_gr_occ_tax |>
 
 region_all <- region_summary_occ |>
     left_join(region_summary_sp) |>
-    left_join(region_summary_end)
+    left_join(region_summary_end) |>
+    left_join(region_summary_1km) |>
+    left_join(region_area) |>
+    mutate(sampled_proportion=round(sq_km/area,3)*100)
 
 write_delim(region_all, "../results/regions_all_stats.tsv", delim="\t")
 
