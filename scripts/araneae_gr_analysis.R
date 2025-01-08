@@ -324,7 +324,7 @@ ggsave("../figures/araneae_gr_base.png",
 ## gbif
 araneae_gr_gbif <- ggplot() +
     geom_sf(greece_regions, mapping=aes(),color="gray70") +
-    geom_point(gbif_join,
+    geom_point(gbif_araneae_gr,
             mapping=aes(y=decimalLatitude, x=decimalLongitude,color=basisOfRecord),
             size=1,
             alpha=0.7,
@@ -332,7 +332,7 @@ araneae_gr_gbif <- ggplot() +
     coord_sf(crs="WGS84") +
     ggtitle("GBIF Araneae of Greece")+
     scale_color_manual(values = c(
-                                  "HUMAN_OBSERVATION"="springgreen2",
+                                  #"HUMAN_OBSERVATION"="springgreen2",
                                   "PRESERVED_SPECIMEN"="lightsalmon2",
                                   "MATERIAL_CITATION"="darkorchid2",
                                   "OCCURRENCE"="springgreen4",
