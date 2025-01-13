@@ -18,18 +18,12 @@ library(units)
 #library(vegan)
 
 # load data 
-municipalities_names <- readxl::read_excel("../data/municipalities_shape_file/names_municipalities_gr_eng.xlsx") |>
-    mutate(KWD_YPES=as.character(KWD_YPES))
-
-hellenic_municipalities_shp <- sf::st_read("../data/municipalities_shape_file/municipalities_Kallikratis_plan_Greece.shp") |>
-    left_join(municipalities_names) |>
-    dplyr::select(-NAME)
-
 gr_1km <- sf::st_read("../data/eea_1km/gr_1km.shp") |>
     st_transform(., crs="WGS84")
 
 # https://gadm.org
 greece_regions <- sf::st_read("../data/gadm41_GRC_shp/gadm41_GRC_2.shp")
+greece_municipalities <- sf::st_read("../data/gadm41_GRC_shp/gadm41_GRC_3.shp")
 
 #greece_regions <- c("Athos","East Macedonia and Thrace","Attica ","West Greece","West Macedonia","Ionian Islands ","Epirus ","Central Macedonia","Crete","South Aegean","Peloponnese ","Central Greece ","Thessaly","North Aegean")
 
@@ -80,6 +74,81 @@ araneae_gr <- st_intersection(araneae_gr_occ_sf,greece_regions) |>
     st_join(gr_1km)
 
 #araneae_gr_1km <- st_join(araneae_gr,gr_1km)
+
+################################## islands #############################
+###
+# Explode multipolygons into individual polygons
+gadm_single <- greece_municipalities |>
+    st_make_valid() |>
+    st_cast("POLYGON", do_split = TRUE) |>
+    mutate(id = row_number())  # Add unique IDs to track original geometries
+# Check connectivity of polygons
+
+#connectivity <- st_relate(gadm_single, gadm_single, pattern = "****0****")
+connectivity <- st_intersects(gadm_single, gadm_single)
+
+# Determine islands (features with no neighbors are islands)
+gadm_single$is_island <- sapply(connectivity, function(x) length(x) == 1)
+
+greece_islands <- gadm_single |>
+  mutate(is_island= ifelse(NAME_2 %in% c("North Aegean","Crete","South Aegean","Ionian Islands"),TRUE,is_island)) |>
+  mutate(region_type = ifelse(is_island, "Island", "Mainland")) |>
+  dplyr::select(is_island,region_type,NAME_2, NAME_3,id) |>
+  mutate(area_island=round(set_units(st_area(geometry),km^2),4)) |>
+  filter(region_type=="Island")
+
+# Crete and Evia ara the only islands in greece that has multiple municipalities
+# so the mainland of Crete is filtered to join all municipalities
+# and keep satelite islands separate.
+crete_only <- greece_islands |>
+    filter(NAME_2=="Crete") |>
+    arrange(desc(area_island)) |>
+    filter(area_island>set_units(100,km^2))
+
+crete_only_one <- st_union(crete_only) |>
+    sf::st_as_sf() |>
+    rename("geometry"="x") |>
+    mutate(is_island=TRUE, region_type="Island", NAME_2="Crete", NAME_3="All Crete", id=0) |> 
+    mutate(area_island=round(set_units(st_area(geometry),km^2),4)) 
+
+# Evia
+evia <- greece_regions |> filter(NAME_2=="Central Greece") |>
+    st_make_valid() |>
+    st_cast("POLYGON", do_split = TRUE) |>
+    mutate(id = row_number()) |> 
+    mutate(area_island=round(set_units(st_area(geometry),km^2),4)) |>
+    filter(area_island>set_units(1000,km^2)) |>
+    filter(area_island<set_units(4000,km^2)) |>
+    dplyr::select(area_island) |>
+    mutate(is_island=TRUE, region_type="Island", NAME_2="Central Greece", NAME_3="Evia", id=1000) 
+
+# first the crete mainland polygons are excluded and then the whole crete is
+# binded to the other
+greece_islands_final <- greece_islands |>
+    filter(!(id %in% crete_only$id)) |>
+    bind_rows(crete_only_one) |>
+    bind_rows(evia)
+
+araneae_gr_a <- st_intersection(araneae_gr,greece_islands)
+
+islands_gr <- ggplot() +
+  geom_sf(greece_islands_final,mapping=aes(fill = region_type)) +
+    #geom_point(araneae_gr_a,
+    #        mapping=aes(x=decimalLatitude, y=decimalLongitude,color=is_island),
+    #        size=1,
+    #        alpha=0.7,
+    #        show.legend=T) +
+  theme_bw() +
+  labs(title = "Islands vs Mainland in GADM Data")
+
+ggsave("islands_gr.png",
+       plot = islands_gr,
+       device = "png",
+       width = 20,
+       height = 20,
+       units = "cm",
+       dpi = 300,
+       path = "../figures/")
 
 
 ############################ taxonomic summary ###########################
@@ -596,3 +665,5 @@ ggsave("araneae_accumulation_plot.png",
        units = "cm",
        dpi = 300,
        path = "../figures/")
+
+
