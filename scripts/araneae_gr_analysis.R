@@ -162,16 +162,16 @@ araneae_gr_occ_tax <- araneae_gr_all |>
 
 write_delim(araneae_gr_occ_tax,"../results/araneae_gr_occ_tax.tsv",delim="\t")
 
-## islands
+##  taxonomy on islands
 
 island_occurrences <- araneae_gr_occ_tax |>
-    distinct(scientificName,decimalLongitude,decimalLatitude,endemic,region_type) |>
-    group_by(region_type,endemic) |>
+    distinct(scientificName,decimalLongitude,decimalLatitude,taxonDistribution,region_type) |>
+    group_by(region_type,taxonDistribution) |>
     summarise(occurrences=n(),.groups="keep")
 
 region_type_species <- araneae_gr_occ_tax |>
-    distinct(scientificName,decimalLongitude,decimalLatitude,region_type,endemic) |>
-    group_by(scientificName,region_type,endemic) |>
+    distinct(scientificName,decimalLongitude,decimalLatitude,region_type,taxonDistribution) |>
+    group_by(scientificName,region_type,taxonDistribution) |>
     summarise(occurrences=n(), .groups="keep")
 
 singular_region_species <- region_type_species |>
@@ -185,8 +185,104 @@ duplicate_region_species <- region_type_species |>
     ungroup() 
 
 singular_region_species_summary <- singular_region_species |>
-    group_by(endemic,region_type) |>
-    summarise(singular_species=n(), .groups="keep")
+    group_by(taxonDistribution,region_type) |>
+    summarise(singular_species=n(), .groups="keep") |>
+    left_join(island_occurrences, by=c("region_type","taxonDistribution"))
+
+write_delim(singular_region_species_summary,"../results/singular_region_species_summary.tsv",delim="\t")
+
+#### islands stats
+
+island_stats <- araneae_gr_occ_tax |>
+    distinct(scientificName,taxonDistribution,region_type, NAME_2, id,area_island) |>
+    filter(region_type=="Island") |>
+    group_by(id,area_island,NAME_2,region_type,taxonDistribution) |>
+    summarise(species=n(), .groups="keep")
+
+### island endemics plots
+island_stats_plot <- ggplot()+
+    geom_point(island_stats,
+               mapping=aes(x=area_island,
+                   y=species,
+                   color=taxonDistribution))+
+
+    theme_bw()
+
+ggsave("island_stats_endemics.png",
+       plot = island_stats_plot,
+       device = "png",
+       width = 30,
+       height = 30,
+       units = "cm",
+       dpi = 300,
+       path = "../figures/")
+
+island_stats_log_plot <- ggplot()+
+    geom_point(island_stats,
+               mapping=aes(x=log10(area_island),
+                   y=log10(species),
+                   color=taxonDistribution))+
+
+    theme_bw()
+
+ggsave("island_stats_log_endemics.png",
+       plot = island_stats_log_plot,
+       device = "png",
+       width = 30,
+       height = 30,
+       units = "cm",
+       dpi = 300,
+       path = "../figures/")
+
+### island types plots
+island_stats_pelagos_plot <- ggplot()+
+    geom_point(island_stats,
+               mapping=aes(x=area_island,
+                   y=species,
+                   color=NAME_2))+
+
+    theme_bw()
+
+ggsave("island_stats_pelagos.png",
+       plot = island_stats_pelagos_plot,
+       device = "png",
+       width = 30,
+       height = 30,
+       units = "cm",
+       dpi = 300,
+       path = "../figures/")
+
+island_stats_pelagos_log_plot <- ggplot()+
+    geom_point(island_stats,
+               mapping=aes(x=log10(area_island),
+                   y=log10(species),
+                   color=NAME_2))+
+#    scale_color_brewer(palette = "Set2")+
+    theme_bw()
+
+ggsave("island_stats_pelagos_log.png",
+       plot = island_stats_pelagos_log_plot,
+       device = "png",
+       width = 30,
+       height = 30,
+       units = "cm",
+       dpi = 300,
+       path = "../figures/")
+
+island_stats_pelagos_log_plot_f <- island_stats_pelagos_log_plot + facet_wrap(~taxonDistribution)
+
+
+ggsave("island_stats_pelagos_log_f.png",
+       plot = island_stats_pelagos_log_plot_f,
+       device = "png",
+       width = 60,
+       height = 30,
+       units = "cm",
+       dpi = 300,
+       path = "../figures/")
+
+# From the total 1299 species, the 735 appear only in mainland Greece or in greek islands.
+#
 
 
 ## IUCN categories per family
