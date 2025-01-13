@@ -94,8 +94,7 @@ greece_islands <- gadm_single |>
   mutate(is_island= ifelse(NAME_2 %in% c("North Aegean","Crete","South Aegean","Ionian Islands"),TRUE,is_island)) |>
   mutate(region_type = ifelse(is_island, "Island", "Mainland")) |>
   dplyr::select(is_island,region_type,NAME_2, NAME_3,id) |>
-  mutate(area_island=round(set_units(st_area(geometry),km^2),4)) |>
-  filter(region_type=="Island")
+  mutate(area_island=round(set_units(st_area(geometry),km^2),4)) 
 
 # Crete and Evia ara the only islands in greece that has multiple municipalities
 # so the mainland of Crete is filtered to join all municipalities
@@ -129,7 +128,7 @@ greece_islands_final <- greece_islands |>
     bind_rows(crete_only_one) |>
     bind_rows(evia)
 
-araneae_gr_a <- st_intersection(araneae_gr,greece_islands)
+araneae_gr_all <- st_intersection(araneae_gr,greece_islands_final)
 
 islands_gr <- ggplot() +
   geom_sf(greece_islands_final,mapping=aes(fill = region_type)) +
@@ -150,15 +149,45 @@ ggsave("islands_gr.png",
        dpi = 300,
        path = "../figures/")
 
+############ to do ##########
+### which are the insular only species
+
 
 ############################ taxonomic summary ###########################
 ## master dataframe
-araneae_gr_occ_tax <- araneae_gr |>
+araneae_gr_occ_tax <- araneae_gr_all |>
     left_join(araneae_gr_tax,
               by=c("scientificName"="scientificName")) |>
-    mutate(taxonDistribution=if_else(is.na(endemic),"Non endemic","Endemic"))
+    mutate(taxonDistribution=if_else(is.na(endemic),"Non endemic","Endemic")) 
 
 write_delim(araneae_gr_occ_tax,"../results/araneae_gr_occ_tax.tsv",delim="\t")
+
+## islands
+
+island_occurrences <- araneae_gr_occ_tax |>
+    distinct(scientificName,decimalLongitude,decimalLatitude,endemic,region_type) |>
+    group_by(region_type,endemic) |>
+    summarise(occurrences=n(),.groups="keep")
+
+region_type_species <- araneae_gr_occ_tax |>
+    distinct(scientificName,decimalLongitude,decimalLatitude,region_type,endemic) |>
+    group_by(scientificName,region_type,endemic) |>
+    summarise(occurrences=n(), .groups="keep")
+
+singular_region_species <- region_type_species |>
+    group_by(scientificName) |>
+    filter(n() == 1) |>
+    ungroup() 
+
+duplicate_region_species <- region_type_species |>
+    group_by(scientificName) |>
+    filter(n() == 2) |>
+    ungroup() 
+
+singular_region_species_summary <- singular_region_species |>
+    group_by(endemic,region_type) |>
+    summarise(singular_species=n(), .groups="keep")
+
 
 ## IUCN categories per family
 
