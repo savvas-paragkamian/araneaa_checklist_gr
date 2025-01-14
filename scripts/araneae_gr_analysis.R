@@ -275,8 +275,8 @@ island_stats_pelagos_log_plot_f <- island_stats_pelagos_log_plot + facet_wrap(~t
 ggsave("island_stats_pelagos_log_f.png",
        plot = island_stats_pelagos_log_plot_f,
        device = "png",
-       width = 60,
-       height = 30,
+       width = 30,
+       height = 15,
        units = "cm",
        dpi = 300,
        path = "../figures/")
