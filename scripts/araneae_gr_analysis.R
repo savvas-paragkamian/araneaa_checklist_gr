@@ -1,4 +1,4 @@
-#!/usr/bin/Rscript
+#!/usr/bin/env Rscript
 
 ## Script name: araneae_gr_analysis.R
 ##
@@ -43,7 +43,12 @@ write_delim(no_coordinates, "../results/no_coordinates.tsv",delim="\t")
 
 ### clean
 ### Agyneta pseudorurestris is twice.
-#araneae_gr_tax |> group_by(scientificName) |> count(scientificName) |> arrange(desc(n)) 
+araneae_gr_tax |> group_by(scientificName) |> count(scientificName) |> arrange(desc(n)) |> filter(n>1)
+
+### refs not used 
+refs_not_used <- araneae_gr_ref[!(araneae_gr_ref$associatedReferences %in% unique(araneae_gr_occ$associatedReferences)),]
+
+refs_used_not_in_references <- unique(araneae_gr_occ$associatedReferences)[!(unique(araneae_gr_occ$associatedReferences) %in% unique(araneae_gr_ref$associatedReferences))] 
 
 ### which species
 
@@ -158,7 +163,7 @@ ggsave("islands_gr.png",
 araneae_gr_occ_tax <- araneae_gr_all |>
     left_join(araneae_gr_tax,
               by=c("scientificName"="scientificName")) |>
-    mutate(taxonDistribution=if_else(is.na(endemic),"Non endemic","Endemic")) 
+    mutate(taxonDistribution=if_else(endemic==0,"Non endemic","Endemic")) 
 
 write_delim(araneae_gr_occ_tax,"../results/araneae_gr_occ_tax.tsv",delim="\t")
 
@@ -355,7 +360,8 @@ araneae_gr_occ_tax_f <- araneae_gr_occ_tax |>
     distinct(family,
              scientificName,
              decimalLongitude,
-             decimalLatitude, CELLCODE) |>
+             decimalLatitude,
+             CELLCODE) |>
     group_by(scientificName,family) |>
     summarise(occurrences=n(),
               sq_km=length(unique(CELLCODE)),
@@ -442,10 +448,10 @@ ggsave("species_family_plot.png",
        path = "../figures/")
 
 ################################## gbif ###################################
-gbif_arachnida <- read_delim("../data/0058835-241126133413365/occurrence.txt", delim="\t")
+gbif_araneae <- read_delim("../data/0000127-250325103851331/occurrence.txt", delim="\t")
 
 # filter
-gbif_f <- gbif_arachnida |>
+gbif_f <- gbif_araneae |>
     dplyr::distinct(phylum,
                   class,
                   order,
@@ -643,7 +649,7 @@ region_summary_sp <- araneae_gr_occ_tax |>
 # endemics
 region_summary_end <- araneae_gr_occ_tax |> 
     distinct(NAME_2,scientificName, endemic) |>
-    na.omit(endemic) |> 
+    filter(endemic==1) |> 
     group_by(NAME_2) |>
     summarise(endemics=n())
 
@@ -668,7 +674,7 @@ araneae_ref_year <- araneae_gr_occ_ref |>
     summarise(occurrance=n()) |>
     arrange(year) |>
     mutate(Cumulative_occurrance=cumsum(occurrance),
-           Classification="Publications") 
+           Classification="Number of Publications") 
 
 
 ## Species knowledge accumulation
@@ -685,25 +691,26 @@ species_cumulative <- araneae_gr_occ_ref |>
     summarise(species_year= n()) |>
     arrange(year) |> 
     mutate(Cumulative_occurrance= cumsum(species_year)) |> 
-    mutate(Classification="All species") |> 
+    mutate(Classification="Species of Spiders of Greece") |> 
     dplyr::select(-c(species_year)) |>
     distinct()
 
 ### endemic species accumulation across the years
 endemic_cumulative_species <- araneae_gr_occ_ref |> 
-    distinct(scientificName,endemic, associatedReferences,year) |>
+    distinct(scientificName,taxonDistribution, associatedReferences,year) |>
+    filter(taxonDistribution=="Endemic") |>
     arrange(year) |>
     mutate(Duplicates=duplicated(scientificName)) |> 
     mutate(First_occurrance=if_else(Duplicates=="FALSE",1,0)) |> 
     na.omit() |> 
     filter(First_occurrance==1) |>
-    group_by(year,endemic) |> 
+    group_by(year,taxonDistribution) |> 
     summarise(endemic_species_year= n(), .groups="keep") |>
     ungroup() |>
     arrange(year) |> 
     mutate(Cumulative_occurrance= cumsum(endemic_species_year)) |>
     mutate(Classification="Endemic species to Greece") |> 
-    dplyr::select(-c(endemic,endemic_species_year)) |> 
+    dplyr::select(-c(taxonDistribution,endemic_species_year)) |> 
     ungroup() 
 
 #################################### GBIF ####################################
@@ -734,7 +741,7 @@ gbif_citizen_cumulative <- gbif_occ_citizen |>
     summarise(species_year= n()) |>
     arrange(year) |> 
     mutate(Cumulative_occurrance= cumsum(species_year)) |> 
-    mutate(Classification="GBIF human observation species") |> 
+    mutate(Classification="GBIF species from human observation | citizen science") |> 
     dplyr::select(-c(species_year)) |>
     distinct()
 
@@ -761,10 +768,10 @@ araneae_accumulation_plot <- ggplot()+
                        expand = c(0.01,0))+
     scale_color_manual(values =c(
                                  "Endemic species to Greece"="firebrick1",
-                                 "GBIF human observation species"="springgreen2",
+                                 "GBIF species from human observation | citizen science"="springgreen2",
                                  "GBIF species from specimen | sample | citation"="chartreuse4",
-                                 "Publications"="darkorchid2",
-                                 "All species"="gray0"
+                                 "Number of Publications"="darkorchid2",
+                                 "Species of Spiders of Greece"="gray0"
                                  ))+
     labs(x="Years",
          y="Cumulative number of species")+
