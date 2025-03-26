@@ -305,7 +305,7 @@ araneae_gr_occ_tax_iucn <- araneae_gr_occ_tax |>
 ## endemics per family
 araneae_endemics_family <- araneae_gr_occ_tax |>
     distinct(family,scientificName,endemic) |>
-    na.omit(endemic) |>
+    filter(endemic==1) |>
     group_by(family) |>
     summarise(endemics=n())
 
