@@ -292,7 +292,7 @@ ggsave("island_stats_pelagos_log_f.png",
 
 ## IUCN categories per family
 
-araneae_gr_occ_tax_iucn <- araneae_gr_occ_tax |>
+araneae_gr_occ_tax_iucn <- araneae_gr_tax |>
     distinct(family,scientificName,iucnStatus) |>
     group_by(family,iucnStatus) |> 
     summarise(species=n(), .groups="keep") |> 
@@ -303,19 +303,12 @@ araneae_gr_occ_tax_iucn <- araneae_gr_occ_tax |>
 
 
 ## endemics per family
-araneae_endemics_family <- araneae_gr_occ_tax |>
+araneae_endemics_family <- araneae_gr_tax |>
     distinct(family,scientificName,endemic) |>
     filter(endemic==1) |>
     group_by(family) |>
     summarise(endemics=n())
 
-araneae_endemics_all_all <- araneae_gr_occ_tax |> 
-    distinct(scientificName,
-             family,
-             decimalLongitude,decimalLatitude,
-             endemic,
-             iucnStatus,CELLCODE) |>
-    filter(!is.na(endemic)) 
 ## all endemics
 araneae_endemics_all <- araneae_gr_occ_tax |> 
     distinct(scientificName,
@@ -323,7 +316,7 @@ araneae_endemics_all <- araneae_gr_occ_tax |>
              decimalLongitude,decimalLatitude,
              endemic,
              iucnStatus,CELLCODE) |>
-    filter(!is.na(endemic)) |>
+    filter(endemic==1) |>
     group_by(scientificName)|>
     mutate(occurrences=n(),
            sq_km=length(unique(CELLCODE)),
@@ -354,6 +347,10 @@ araneae_endemics_sum <- araneae_endemics_all |>
 ## summary per family
 ###     distinct(family, scientificName,decimalLongitude,decimalLatitude) 
 ###     because some references have the same occurrence
+araneae_family_species <- araneae_gr_tax |>
+    distinct(scientificName,family) |>
+    group_by(family) |>
+    summarise(species=n())
 
 araneae_gr_occ_tax_f <- araneae_gr_occ_tax |> 
     st_drop_geometry() |>
@@ -367,9 +364,9 @@ araneae_gr_occ_tax_f <- araneae_gr_occ_tax |>
               sq_km=length(unique(CELLCODE)),
               .groups="keep") |> 
     group_by(family) |>
-    summarise(species=n(),
-              occurrences=sum(occurrences),
+    summarise(occurrences=sum(occurrences),
               sq_km=sum(sq_km)) |>
+    full_join(araneae_family_species) |>
     left_join(araneae_endemics_family) |>
     mutate(across(everything(), ~ replace_na(.x, 0)))
 
@@ -382,17 +379,26 @@ araneae_total_iucn <- araneae_f  |>
     dplyr::select(-c(occurrences,sq_km)) |>
     mutate(family="total") |>
     group_by(family) |>
-    summarise(across(everything(), ~ sum(.x,na.rm = TRUE))) 
+    summarise(across(everything(), ~ sum(.x,na.rm = F))) 
+
+araneae_total <- araneae_gr_occ_tax |>
+    mutate(family="total") |>
+    distinct(decimalLongitude,decimalLatitude,scientificName,family) |>
+    group_by(family) |>
+    summarise(occurrences=n())
 
 araneae_total_area <- araneae_gr_occ_tax |>
     mutate(family="total") |>
     distinct(decimalLongitude,decimalLatitude,CELLCODE, family) |>
     group_by(family) |>
-    summarise(occurrences=n(), sq_km=length(unique(CELLCODE)))
+    summarise(sq_km=length(unique(CELLCODE))) |> 
+    left_join(araneae_total)
 
+#CR, EN, VU, NT, DD, LC, N/Α
 araneae_family_summary <- araneae_total_area |>
     left_join(araneae_total_iucn) |>
-    bind_rows(araneae_endemics_sum,araneae_f)
+    bind_rows(araneae_endemics_sum,araneae_f) |>
+    relocate(family,species,endemics, occurrences, sq_km, CR, EN, VU, NT, DD, LC, "N/A")
 
 write_delim(araneae_family_summary,
             "../results/araneae_family_summary.tsv",
