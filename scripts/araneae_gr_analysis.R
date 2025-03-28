@@ -572,6 +572,8 @@ for (i in seq_along(family_names)) {
 
     family_data <- araneae_gr_occ_tax |>
         filter(family==family_names[i])
+    family_species <- araneae_family_summary[araneae_family_summary$family==family_names[i],]$species
+    family_endemics <- araneae_family_summary[araneae_family_summary$family==family_names[i],]$endemics
 
     araneae_family <- ggplot() +
         geom_sf(greece_regions, mapping=aes(),color="gray70") +
@@ -581,13 +583,13 @@ for (i in seq_along(family_names)) {
                 alpha=0.7,
                 show.legend=T) +
         coord_sf(crs="WGS84") +
-        ggtitle(family_names[i]) +
+        ggtitle(paste0(family_names[i],", Species = ",family_species, ", Endemics = ",family_endemics,sep="")) +
         scale_color_manual(values = c("Endemic"="firebrick1",
                                    "Non endemic"="cadetblue"))+
         theme_bw()+
         theme(axis.title=element_blank(),
               axis.text=element_text(colour="black"),
-              legend.title = element_text(size=8),
+              legend.title = element_text(size=7),
               legend.position = "inside",
               legend.position.inside = c(0.9,0.9),
               legend.box.background = element_blank())
@@ -608,8 +610,8 @@ fig2 <- ggarrange(araneae_gr_base,
                   araneae_gr_gbif,
                   family_plots[["Gnaphosidae"]],
                   family_plots[["Dysderidae"]],
-                  family_plots[["Theraphosidae"]],
-                  family_plots[["Leptonetidae"]],
+                  family_plots[["Linyphiidae"]],
+                  family_plots[["Zodariidae"]],
           labels = c("A", "B","C","D","E","F"),
           align = "hv",
           widths = c(1,1,1,1,1,1),
