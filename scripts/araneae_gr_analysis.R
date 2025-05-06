@@ -527,6 +527,72 @@ ggsave("../figures/araneae_gr_base.png",
        units="cm",
        device="png")
 
+## aranea redlist
+iucn_colors <- c(
+  "DD" = "gray42",    # Data Deficient
+  "N/A" = "gray74",    # Not Assessed
+  "LC" = "#00FF00",    # Least Concern
+  "NT" = "#9ACD32",    # Near Threatened
+  "VU" = "#FFFF00",    # Vulnerable
+  "EN" = "#FF9900",    # Endangered
+  "CR" = "#FF0000"    # Critically Endangered
+)
+
+araneae_gr_occ_tax$iucnStatus2 <- factor(araneae_gr_occ_tax$iucnStatus, levels = c("DD", "N/A", "LC", "NT", "VU", "EN", "CR"))
+
+araneae_gr_occ_tax <- araneae_gr_occ_tax[order(araneae_gr_occ_tax$iucnStatus2), ]
+
+araneae_gr_redlist <- ggplot() +
+    geom_sf(greece_regions, mapping=aes(),color="gray70") +
+    geom_point(araneae_gr_occ_tax,
+            mapping=aes(x=decimalLatitude, y=decimalLongitude,color=iucnStatus2),
+            size=1,
+            alpha=0.9,
+            show.legend=T) +
+    coord_sf(crs="WGS84") +
+    scale_color_manual(values =iucn_colors, name="IUCN category")+
+    theme_bw()+
+    theme(
+        axis.title = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        panel.background = element_blank(),
+        panel.grid = element_blank(),
+        panel.border = element_blank(),
+        legend.title = element_text(size = 8),
+        legend.position = "inside",
+        legend.position.inside = c(0.9, 0.8),
+        legend.box.background = element_blank()
+  )
+
+ggsave("../figures/araneae_gr_redlist.png", 
+       plot=araneae_gr_redlist, 
+       height = 20, 
+       width = 26,
+       dpi = 300, 
+       units="cm",
+       device="png")
+
+### facet
+
+araneae_gr_redlist_f <- araneae_gr_redlist +
+    facet_wrap(~iucnStatus2,nrow=2)+
+    theme(
+        legend.position = "inside",
+        legend.position.inside = c(0.9, 0.2)
+    )
+
+
+ggsave("../figures/araneae_gr_redlist_f.png", 
+       plot=araneae_gr_redlist_f, 
+       height = 20, 
+       width = 40,
+       dpi = 300, 
+       units="cm",
+       device="png")
+
+
+
 ## gbif
 araneae_gr_gbif <- ggplot() +
     geom_sf(greece_regions, mapping=aes(),color="gray70") +
