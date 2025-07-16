@@ -528,6 +528,7 @@ ggsave("../figures/araneae_gr_base.png",
        device="png")
 
 ## aranea redlist
+## ICZEGAR conference in Athens
 iucn_colors <- c(
   "DD" = "gray42",    # Data Deficient
   "N/A" = "gray74",    # Not Assessed
@@ -831,11 +832,11 @@ araneae_accumulation_plot <- ggplot()+
     geom_line(data=araneae_accumulation,
               aes(x=year,
                   y= Cumulative_occurrance,color=Classification),
-              linewidth=1,
+              linewidth=2.5,
               show.legend = T)+
     #ggtitle("Class")+
     scale_x_continuous(breaks = seq(1830,2030,10),
-                       limits = c(1830,2030),
+                       limits = c(1830,2033),
                        expand=c(0.015,0))+
     scale_y_continuous(breaks = seq(0,1400,100),
                        limits = c(0,1400),
@@ -852,22 +853,25 @@ araneae_accumulation_plot <- ggplot()+
     theme_bw()+
     theme(panel.grid.minor = element_blank(), 
           panel.grid.major = element_blank(),
-          legend.text = element_text(size = 18),
-          axis.text.y=element_text(margin = margin(t = 0, r = 5, b = 0, l = 15,unit = "pt"),size = 18),
-          axis.text.x = element_text(margin = margin(t = 5, r = 0, b = 15, l = 0,unit = "pt"),size = 18),
+          legend.text = element_text(size = 20),
+          axis.text.y=element_text(margin = margin(t = 0, r = 5, b = 0, l = 15,unit = "pt"),
+                                   size = 20),
+          axis.text.x = element_text(margin = margin(t = 5, r = 0, b = 15, l = 0,unit = "pt"),
+                                     size = 20),
           axis.title = element_text(size=22),
           panel.border = element_blank(),
-          axis.line.x = element_line(colour = 'black', linewidth = 0.3), 
-          axis.line.y = element_line(colour = 'black', linewidth = 0.3),
-          legend.position = c(0.23,0.87), 
+          axis.line.x = element_line(colour = 'black', linewidth = 0.8), 
+          axis.line.y = element_line(colour = 'black', linewidth = 0.8),
+          legend.position = "inside",
+          legend.position.inside=c(0.3,0.87), 
           legend.key.size = unit(1.5, "cm"), 
           legend.title = element_blank())
   
 ggsave("araneae_accumulation_plot.png",
        plot = araneae_accumulation_plot,
        device = "png",
-       width = 50,
-       height = 36,
+       width = 40,
+       height = 30,
        units = "cm",
        dpi = 300,
        path = "../figures/")
