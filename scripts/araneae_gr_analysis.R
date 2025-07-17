@@ -514,6 +514,8 @@ araneae_gr_base <- ggplot() +
     theme_bw()+
     theme(axis.title=element_blank(),
           axis.text=element_text(colour="black"),
+          panel.grid.minor = element_blank(), 
+          panel.grid.major = element_blank(),
           legend.title = element_text(size=8),
           legend.position = "inside",
           legend.position.inside = c(0.9,0.9),
@@ -614,9 +616,11 @@ araneae_gr_gbif <- ggplot() +
     theme_bw()+
     theme(axis.title=element_blank(),
           axis.text=element_text(colour="black"),
+          panel.grid.minor = element_blank(), 
+          panel.grid.major = element_blank(),
           legend.title = element_text(size=8),
           legend.position = "inside",
-          legend.position.inside = c(0.85,0.8),
+          legend.position.inside = c(0.845,0.8),
           legend.box.background = element_blank())
 
 ggsave("../figures/araneae_gr_gbif.png", 
@@ -656,6 +660,8 @@ for (i in seq_along(family_names)) {
         theme_bw()+
         theme(axis.title=element_blank(),
               axis.text=element_text(colour="black"),
+              panel.grid.minor = element_blank(), 
+              panel.grid.major = element_blank(),
               legend.title = element_text(size=7),
               legend.position = "inside",
               legend.position.inside = c(0.9,0.9),
@@ -679,7 +685,7 @@ fig2 <- ggarrange(araneae_gr_base,
                   family_plots[["Dysderidae"]],
                   family_plots[["Linyphiidae"]],
                   family_plots[["Zodariidae"]],
-          labels = c("A", "B","C","D","E","F"),
+          labels = c("(a)", "(b)","(c)","(d)","(e)","(f)"),
           align = "hv",
           widths = c(1,1,1,1,1,1),
           ncol = 2,
@@ -688,9 +694,9 @@ fig2 <- ggarrange(araneae_gr_base,
 
 ggsave("../figures/Fig2.png", 
        plot=fig2, 
-       height = 50, 
+       height = 53, 
        width = 35,
-       dpi = 300, 
+       dpi = 600, 
        units="cm",
        device="png")
 
@@ -851,7 +857,8 @@ araneae_accumulation_plot <- ggplot()+
     labs(x="Years",
          y="Cumulative number of species")+
     theme_bw()+
-    theme(panel.grid.minor = element_blank(), 
+    theme(
+          panel.grid.minor = element_blank(), 
           panel.grid.major = element_blank(),
           legend.text = element_text(size = 20),
           axis.text.y=element_text(margin = margin(t = 0, r = 5, b = 0, l = 15,unit = "pt"),
