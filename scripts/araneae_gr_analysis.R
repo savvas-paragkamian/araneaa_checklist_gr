@@ -245,7 +245,6 @@ island_stats_pelagos_plot <- ggplot()+
                mapping=aes(x=area_island,
                    y=species,
                    color=NAME_2))+
-
     theme_bw()
 
 ggsave("island_stats_pelagos.png",
@@ -450,7 +449,7 @@ ggsave("species_family_plot.png",
        width = 60,
        height = 20,
        units = "cm",
-       dpi = 300,
+       dpi = 600,
        path = "../figures/")
 
 ################################## gbif ###################################
@@ -525,7 +524,7 @@ ggsave("../figures/araneae_gr_base.png",
        plot=araneae_gr_base, 
        height = 20, 
        width = 20,
-       dpi = 300, 
+       dpi = 600, 
        units="cm",
        device="png")
 
@@ -572,7 +571,7 @@ ggsave("../figures/araneae_gr_redlist.png",
        plot=araneae_gr_redlist, 
        height = 20, 
        width = 26,
-       dpi = 300, 
+       dpi = 600, 
        units="cm",
        device="png")
 
@@ -590,7 +589,7 @@ ggsave("../figures/araneae_gr_redlist_f.png",
        plot=araneae_gr_redlist_f, 
        height = 20, 
        width = 40,
-       dpi = 300, 
+       dpi = 600, 
        units="cm",
        device="png")
 
@@ -672,7 +671,7 @@ for (i in seq_along(family_names)) {
            plot=araneae_family, 
            height = 20, 
            width = 20,
-           dpi = 300, 
+           dpi = 600, 
            units="cm",
            device="png")
 
